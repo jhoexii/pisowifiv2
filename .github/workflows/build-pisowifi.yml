@@ -136,15 +136,7 @@ jobs:
           mkdir -p \
             userpatches/overlay/etc/pisowifi
 
-          cat > userpatches/overlay/etc/pisowifi/build.env <<EOF
-PISOWIFI_SSID=${WIFI_SSID}
-PISOWIFI_WIFI_PASSWORD=${WIFI_PASSWORD}
-PISOWIFI_ADMIN_PASSWORD=${ADMIN_PASSWORD}
-PISOWIFI_GPIO_CHIP=${GPIO_CHIP}
-PISOWIFI_GPIO_LINE=${GPIO_LINE}
-PISOWIFI_WIFI_INTERFACE=${WIFI_INTERFACE}
-PISOWIFI_WAN_INTERFACE=${WAN_INTERFACE}
-EOF
+          mkdir -p userpatches/overlay/etc/pisowifi && printf 'PISOWIFI_SSID=%s\nPISOWIFI_WIFI_PASSWORD=%s\nPISOWIFI_ADMIN_PASSWORD=%s\nPISOWIFI_GPIO_CHIP=%s\nPISOWIFI_GPIO_LINE=%s\nPISOWIFI_WIFI_INTERFACE=%s\nPISOWIFI_WAN_INTERFACE=%s\n' "$WIFI_SSID" "$WIFI_PASSWORD" "$ADMIN_PASSWORD" "$GPIO_CHIP" "$GPIO_LINE" "$WIFI_INTERFACE" "$WAN_INTERFACE" > userpatches/overlay/etc/pisowifi/build.env && chmod 600 userpatches/overlay/etc/pisowifi/build.env
 
           chmod 600 \
             userpatches/overlay/etc/pisowifi/build.env
