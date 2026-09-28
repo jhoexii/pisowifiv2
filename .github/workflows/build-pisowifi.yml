@@ -1,0 +1,113 @@
+name: Build PisoWiFi Orange Pi Zero 3
+
+on:
+  workflow_dispatch:
+    inputs:
+      ssid:
+        description: Wi-Fi SSID
+        required: true
+        default: PisoWiFi
+      wifi_password:
+        description: Wi-Fi password (8+ characters)
+        required: true
+        type: string
+      admin_password:
+        description: PisoWiFi admin password
+        required: true
+        type: string
+      gpio_line:
+        description: Linux GPIO line for the coin input
+        required: true
+        default: "6"
+      gpio_chip:
+        description: GPIO chip device
+        required: true
+        default: /dev/gpiochip0
+      wifi_interface:
+        description: Wi-Fi interface
+        required: true
+        default: wlan0
+      wan_interface:
+        description: Internet/WAN interface
+        required: true
+        default: eth0
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+
+    steps:
+      - name: Check out PisoWiFi project
+        uses: actions/checkout@v4
+
+      - name: Free runner disk space
+        uses: descriptinc/free-disk-space@main
+        with:
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+
+      - name: Prepare build-time configuration
+        env:
+          WIFI_PASSWORD: ${{ inputs.wifi_password }}
+          ADMIN_PASSWORD: ${{ inputs.admin_password }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+
+          values = {
+              "PISOWIFI_WIFI_INTERFACE": "${{ inputs.wifi_interface }}",
+              "PISOWIFI_WAN_INTERFACE": "${{ inputs.wan_interface }}",
+              "PISOWIFI_SSID": "${{ inputs.ssid }}",
+              "PISOWIFI_WIFI_PASSWORD": os.environ["WIFI_PASSWORD"],
+              "PISOWIFI_ADMIN_PASSWORD": os.environ["ADMIN_PASSWORD"],
+              "PISOWIFI_GPIO_CHIP": "${{ inputs.gpio_chip }}",
+              "PISOWIFI_GPIO_LINE": "${{ inputs.gpio_line }}",
+          }
+
+          # Keep secrets out of the Git repository. The generated file is only
+          # present in the ephemeral GitHub runner and is copied into the image
+          # customization overlay for the build.
+          out = Path("userpatches/overlay/etc/pisowifi/build.env")
+          out.parent.mkdir(parents=True, exist_ok=True)
+          out.write_text("".join(f"{k}={v}\n" for k, v in values.items()))
+          out.chmod(0o600)
+          PY
+
+      - name: Build Armbian image
+        uses: armbian/build@main
+        with:
+          armbian_token: ${{ github.token }}
+          armbian_runner_clean: yes
+          armbian_target: build
+          armbian_branch: main
+          armbian_kernel_branch: current
+          armbian_release: trixie
+          armbian_board: orangepizero3
+          armbian_ui: minimal
+          armbian_compress: sha,img,xz
+          armbian_artifacts: build/output/images/
+
+      - name: Show generated images
+        run: |
+          set -euo pipefail
+          find build/output/images -maxdepth 1 -type f -printf '%f %s bytes\n' | sort
+
+      - name: Upload PisoWiFi image
+        uses: actions/upload-artifact@v4
+        with:
+          name: pisowifi-orangepi-zero3-image
+          path: |
+            build/output/images/*.img.xz
+            build/output/images/*.img.xz.sha
+          if-no-files-found: error
+          retention-days: 14
