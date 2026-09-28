@@ -1,49 +1,71 @@
+```yaml
 name: Build PisoWiFi Orange Pi Zero 3
 
 on:
   workflow_dispatch:
     inputs:
       ssid:
-        description: Wi-Fi SSID
+        description: "Wi-Fi SSID"
         required: true
-        default: PisoWiFi
+        default: "PisoWiFi"
+        type: string
+
       wifi_password:
-        description: Wi-Fi password (8+ characters)
+        description: "Wi-Fi password (8+ characters)"
         required: true
         type: string
+
       admin_password:
-        description: PisoWiFi admin password
+        description: "PisoWiFi admin password"
         required: true
         type: string
+
       gpio_line:
-        description: Linux GPIO line for the coin input
+        description: "Linux GPIO line for the coin input"
         required: true
         default: "6"
-      gpio_chip:
-        description: GPIO chip device
-        required: true
-        default: /dev/gpiochip0
-      wifi_interface:
-        description: Wi-Fi interface
-        required: true
-        default: wlan0
-      wan_interface:
-        description: Internet/WAN interface
-        required: true
-        default: eth0
+        type: string
 
+      gpio_chip:
+        description: "GPIO chip device"
+        required: true
+        default: "/dev/gpiochip0"
+        type: string
+
+      wifi_interface:
+        description: "Wi-Fi interface"
+        required: true
+        default: "wlan0"
+        type: string
+
+      wan_interface:
+        description: "Internet/WAN interface"
+        required: true
+        default: "eth0"
+        type: string
+
+# Armbian's current GitHub Action can publish build output through
+# the GitHub token, so the workflow needs repository contents write access.
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
+    name: Build Orange Pi Zero 3 PisoWiFi
     runs-on: ubuntu-24.04
     timeout-minutes: 360
 
     steps:
+
+      # ------------------------------------------------------------
+      # 1. Checkout PisoWiFi project
+      # ------------------------------------------------------------
       - name: Check out PisoWiFi project
         uses: actions/checkout@v4
 
+      # ------------------------------------------------------------
+      # 2. Free disk space
+      # ------------------------------------------------------------
       - name: Free runner disk space
         uses: descriptinc/free-disk-space@main
         with:
@@ -54,55 +76,186 @@ jobs:
           docker-images: true
           swap-storage: true
 
+      # ------------------------------------------------------------
+      # 3. Check repository structure
+      # ------------------------------------------------------------
+      - name: Check PisoWiFi files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "===== Repository ====="
+          pwd
+
+          echo "===== Top level ====="
+          ls -la
+
+          echo "===== userpatches ====="
+          if [ -d userpatches ]; then
+            find userpatches -maxdepth 4 -type f -print | sort
+          else
+            echo "ERROR: userpatches directory is missing"
+            exit 1
+          fi
+
+      # ------------------------------------------------------------
+      # 4. Create build configuration
+      # ------------------------------------------------------------
       - name: Prepare build-time configuration
+        shell: bash
         env:
           WIFI_PASSWORD: ${{ inputs.wifi_password }}
           ADMIN_PASSWORD: ${{ inputs.admin_password }}
+          PISOWIFI_SSID: ${{ inputs.ssid }}
+          PISOWIFI_GPIO_CHIP: ${{ inputs.gpio_chip }}
+          PISOWIFI_GPIO_LINE: ${{ inputs.gpio_line }}
+          PISOWIFI_WIFI_INTERFACE: ${{ inputs.wifi_interface }}
+          PISOWIFI_WAN_INTERFACE: ${{ inputs.wan_interface }}
+
         run: |
           set -euo pipefail
+
+          mkdir -p userpatches/overlay/etc/pisowifi
+
           python3 - <<'PY'
           from pathlib import Path
           import os
 
           values = {
-              "PISOWIFI_WIFI_INTERFACE": "${{ inputs.wifi_interface }}",
-              "PISOWIFI_WAN_INTERFACE": "${{ inputs.wan_interface }}",
-              "PISOWIFI_SSID": "${{ inputs.ssid }}",
+              "PISOWIFI_SSID": os.environ["PISOWIFI_SSID"],
               "PISOWIFI_WIFI_PASSWORD": os.environ["WIFI_PASSWORD"],
               "PISOWIFI_ADMIN_PASSWORD": os.environ["ADMIN_PASSWORD"],
-              "PISOWIFI_GPIO_CHIP": "${{ inputs.gpio_chip }}",
-              "PISOWIFI_GPIO_LINE": "${{ inputs.gpio_line }}",
+              "PISOWIFI_GPIO_CHIP": os.environ["PISOWIFI_GPIO_CHIP"],
+              "PISOWIFI_GPIO_LINE": os.environ["PISOWIFI_GPIO_LINE"],
+              "PISOWIFI_WIFI_INTERFACE": os.environ["PISOWIFI_WIFI_INTERFACE"],
+              "PISOWIFI_WAN_INTERFACE": os.environ["PISOWIFI_WAN_INTERFACE"],
           }
 
-          # Keep secrets out of the Git repository. The generated file is only
-          # present in the ephemeral GitHub runner and is copied into the image
-          # customization overlay for the build.
-          out = Path("userpatches/overlay/etc/pisowifi/build.env")
-          out.parent.mkdir(parents=True, exist_ok=True)
-          out.write_text("".join(f"{k}={v}\n" for k, v in values.items()))
-          out.chmod(0o600)
+          output = Path(
+              "userpatches/overlay/etc/pisowifi/build.env"
+          )
+
+          output.parent.mkdir(parents=True, exist_ok=True)
+
+          with output.open("w", encoding="utf-8") as f:
+              for key, value in values.items():
+                  # Basic protection against malformed environment files.
+                  value = str(value).replace("\n", "").replace("\r", "")
+                  f.write(f"{key}={value}\n")
+
+          output.chmod(0o600)
+
+          print("Created build configuration:")
+          print(output)
+
+          # Never print passwords.
+          print("SSID:", values["PISOWIFI_SSID"])
+          print("Wi-Fi interface:", values["PISOWIFI_WIFI_INTERFACE"])
+          print("WAN interface:", values["PISOWIFI_WAN_INTERFACE"])
+          print("GPIO chip:", values["PISOWIFI_GPIO_CHIP"])
+          print("GPIO line:", values["PISOWIFI_GPIO_LINE"])
           PY
 
-      - name: Build Armbian image
+      # ------------------------------------------------------------
+      # 5. Validate workflow configuration
+      # ------------------------------------------------------------
+      - name: Validate configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -f userpatches/overlay/etc/pisowifi/build.env
+
+          echo "===== Build configuration keys ====="
+          sed 's/=.*$/=<hidden>/' \
+            userpatches/overlay/etc/pisowifi/build.env
+
+      # ------------------------------------------------------------
+      # 6. Build Armbian
+      # ------------------------------------------------------------
+      - name: Build Armbian Orange Pi Zero 3 image
         uses: armbian/build@main
         with:
           armbian_token: ${{ github.token }}
-          armbian_runner_clean: yes
-          armbian_target: build
-          armbian_branch: main
-          armbian_kernel_branch: current
-          armbian_release: trixie
-          armbian_board: orangepizero3
-          armbian_ui: minimal
-          armbian_compress: sha,img,xz
-          armbian_artifacts: build/output/images/
 
+          # Clean the GitHub runner before the build.
+          armbian_runner_clean: "yes"
+
+          # Build a complete image.
+          armbian_target: "build"
+
+          # Armbian build framework branch.
+          armbian_branch: "main"
+
+          # Current kernel.
+          armbian_kernel_branch: "current"
+
+          # Debian Trixie.
+          armbian_release: "trixie"
+
+          # Orange Pi Zero 3.
+          armbian_board: "orangepizero3"
+
+          # Minimal/server image.
+          armbian_ui: "minimal"
+
+          # Generate compressed image + checksum.
+          armbian_compress: "sha,img,xz"
+
+          # Armbian output directory.
+          armbian_artifacts: "build/output/images/"
+
+          # Release metadata.
+          armbian_release_title: "PisoWiFi Orange Pi Zero 3"
+
+          armbian_release_body: |
+            Automated PisoWiFi Orange Pi Zero 3 image.
+
+            Built by GitHub Actions using Armbian.
+
+            Board:
+            Orange Pi Zero 3
+
+            OS:
+            Debian Trixie
+
+            Image:
+            Minimal
+
+          # Allow Armbian's action to use the repository token.
+          armbian_release_prerelease: "true"
+
+      # ------------------------------------------------------------
+      # 7. Find generated image
+      # ------------------------------------------------------------
       - name: Show generated images
+        shell: bash
         run: |
           set -euo pipefail
-          find build/output/images -maxdepth 1 -type f -printf '%f %s bytes\n' | sort
 
-      - name: Upload PisoWiFi image
+          echo "===== Build output ====="
+
+          if [ ! -d build/output/images ]; then
+            echo "ERROR: build/output/images does not exist"
+            echo
+            echo "Searching for generated images..."
+            find . -type f \
+              \( -name "*.img" -o -name "*.img.xz" -o -name "*.img.zst" \) \
+              -print || true
+
+            exit 1
+          fi
+
+          find build/output/images \
+            -maxdepth 1 \
+            -type f \
+            -printf '%f %s bytes\n' \
+            | sort
+
+      # ------------------------------------------------------------
+      # 8. Upload image as GitHub Actions artifact
+      # ------------------------------------------------------------
+      - name: Upload PisoWiFi Orange Pi image
         uses: actions/upload-artifact@v4
         with:
           name: pisowifi-orangepi-zero3-image
@@ -111,3 +264,17 @@ jobs:
             build/output/images/*.img.xz.sha
           if-no-files-found: error
           retention-days: 14
+
+      # ------------------------------------------------------------
+      # 9. Upload complete build logs if available
+      # ------------------------------------------------------------
+      - name: Upload build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pisowifi-build-diagnostics
+          path: |
+            build/output/logs/**
+            build/output/debug/**
+          if-no-files-found: ignore
+          retention-days: 7
