@@ -1,0 +1,14 @@
+{% extends "base.html" %}{% block content %}
+<h2>Dashboard</h2><div class=stats>
+<div><small>Vouchers</small><b>{{stats.vouchers}}</b></div><div><small>Used</small><b>{{stats.used}}</b></div>
+<div><small>Active</small><b>{{stats.active}}</b></div><div><small>Coins</small><b>₱{{stats.coins}}</b></div></div>
+<div class=card><h3>Generate voucher</h3>
+{% for price,p in plans.items() %}<form method=post action="/admin/voucher" class=adminplan>
+<input type=hidden name=price value="{{price}}"><b>₱{{price}} — {{p.name}}</b>
+<span>{{p.minutes}} min • {{p.speed_mbps}} Mbps • {{p.data_mb}} MB</span><button>GENERATE</button></form>{% endfor %}
+</div>
+<div class=card><h3>Active sessions</h3>{% for s in sessions %}
+<div class=row><b>{{s.ip}}</b><span>{{s.plan}}</span><span>{{s.expires_at}}</span></div>
+{% else %}<p>No active sessions.</p>{% endfor %}</div>
+<form method=post action="/admin/logout"><button class=button>LOG OUT</button></form>
+{% endblock %}

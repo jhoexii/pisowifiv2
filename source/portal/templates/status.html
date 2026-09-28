@@ -1,0 +1,25 @@
+{% extends "base.html" %}{% block content %}
+{% if session %}
+<div class=card>
+<div class=tag>ONLINE</div><h1 id=timer>--:--:--</h1>
+<p>{{session.plan}} • {{session.speed_mbps}} Mbps</p>
+<div class=bar><span id=dataBar></span></div>
+<p><span id=dataText>Loading...</span></p>
+</div>
+<div class=card><h3>Enjoy your internet</h3><p>Keep this page open to monitor your remaining time.</p></div>
+<script>
+const exp=new Date("{{session.expires_at}}");
+const limit={{session.data_limit_mb}};
+function tick(){let s=Math.max(0,Math.floor((exp-new Date())/1000));
+let h=Math.floor(s/3600),m=Math.floor((s%3600)/60),x=s%60;
+document.getElementById('timer').textContent=[h,m,x].map(v=>String(v).padStart(2,'0')).join(':');
+if(s<=0)location.reload();}
+async function stat(){try{let x=await fetch('/api/status').then(r=>r.json());
+if(!x.active){location.reload();return}
+let used=x.data_used_mb||0;document.getElementById('dataText').textContent=
+Math.round(used)+' MB / '+limit+' MB used';
+document.getElementById('dataBar').style.width=Math.min(100,used/limit*100)+'%';}catch(e){}}
+tick();stat();setInterval(tick,1000);setInterval(stat,5000);
+</script>
+{% else %}<div class=card><h2>Not connected</h2><a class=button href="/">Back</a></div>{% endif %}
+{% endblock %}

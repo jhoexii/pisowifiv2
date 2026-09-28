@@ -1,0 +1,14 @@
+[Unit]
+Description=PisoWiFi hotspot interface setup
+After=network-online.target
+Wants=network-online.target
+Before=hostapd.service dnsmasq.service nftables.service pisowifi.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/pisowifi/pisowifi.env
+ExecStart=/bin/sh -c 'ip link set "$WIFI_INTERFACE" up; ip addr replace "$HOTSPOT_IP/24" dev "$WIFI_INTERFACE"'
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

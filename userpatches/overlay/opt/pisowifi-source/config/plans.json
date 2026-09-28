@@ -1,0 +1,6 @@
+{
+  "5":  {"name":"Quick Surf","minutes":30,"speed_mbps":2,"data_mb":300},
+  "10": {"name":"1 Hour","minutes":60,"speed_mbps":4,"data_mb":700},
+  "20": {"name":"3 Hours","minutes":180,"speed_mbps":6,"data_mb":2048},
+  "50": {"name":"24 Hours","minutes":1440,"speed_mbps":10,"data_mb":8192}
+}

@@ -1,0 +1,7 @@
+[Unit]
+Description=PisoWiFi V2 session enforcement
+
+[Service]
+EnvironmentFile=/etc/pisowifi/pisowifi.env
+Environment=PISOWIFI_DB=/var/lib/pisowifi/pisowifi.db
+ExecStart=/opt/pisowifi/venv/bin/python /opt/pisowifi/scripts/expire_sessions.py

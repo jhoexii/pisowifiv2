@@ -1,0 +1,14 @@
+[Unit]
+Description=PisoWiFi V2 portal
+After=pisowifi-network.service nftables.service
+
+[Service]
+WorkingDirectory=/opt/pisowifi/portal
+EnvironmentFile=/etc/pisowifi/pisowifi.env
+Environment=PISOWIFI_DB=/var/lib/pisowifi/pisowifi.db
+ExecStart=/opt/pisowifi/venv/bin/python /opt/pisowifi/portal/app.py
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,8 @@
+[Unit]
+Description=Refresh PisoWiFi authorization every minute
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=1min
+Unit=pisowifi-expire.service
+[Install]
+WantedBy=timers.target

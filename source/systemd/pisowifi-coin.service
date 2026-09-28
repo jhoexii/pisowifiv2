@@ -1,0 +1,13 @@
+[Unit]
+Description=PisoWiFi V2 coin pulse daemon
+After=network.target pisowifi-network.service
+
+[Service]
+EnvironmentFile=/etc/pisowifi/pisowifi.env
+Environment=PISOWIFI_DB=/var/lib/pisowifi/pisowifi.db
+ExecStart=/opt/pisowifi/venv/bin/python /opt/pisowifi/coin/coin_daemon.py
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,22 @@
+{% extends "base.html" %}{% block content %}
+{% if session %}
+<div class=card><div class=tag>CONNECTED</div><h2>{{session.plan}}</h2><p>Your session is already active.</p><a class=button href="/status">VIEW SESSION</a></div>
+{% else %}
+<div class=hero><span>📶</span><h1>Get Online</h1><p>Choose a package or enter your voucher.</p></div>
+<div class=plans>
+{% for price,p in plans.items() %}
+<form class=plan method=post action="/activate">
+<input type=hidden name=code value="">
+<div class=price>₱{{price}}</div><h3>{{p.name}}</h3>
+<p>{{p.minutes}} minutes</p><p>{{p.speed_mbps}} Mbps • {{p.data_mb}} MB</p>
+<button type=button onclick="buy({{price}})">SELECT</button></form>
+{% endfor %}
+</div>
+<div class=card><h3>Have a voucher?</h3><form method=post action="/activate">
+<input name=code placeholder="XXXX-XXXX" autocomplete=off required>
+<button class=button>CONNECT</button></form></div>
+<p class=hint>Payment integration can be connected to the selected plan later.</p>
+<script>
+function buy(p){alert("Insert ₱"+p+" in the coin slot. The generated voucher will appear on the machine/admin screen.");}
+</script>
+{% endif %}{% endblock %}

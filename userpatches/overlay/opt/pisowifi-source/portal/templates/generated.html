@@ -1,0 +1,4 @@
+{% extends "base.html" %}{% block content %}
+<div class=card><div class=tag>VOUCHER READY</div><h1 class=code>{{code}}</h1>
+<h3>₱{{price}} • {{plan.name}}</h3><p>{{plan.minutes}} minutes • {{plan.speed_mbps}} Mbps • {{plan.data_mb}} MB</p>
+<p>Give this code to the customer.</p><a class=button href="/admin">BACK</a></div>{% endblock %}
